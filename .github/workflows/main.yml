@@ -1,0 +1,61 @@
+name: Analog Video Mixer Feedback Effect
+
+on:
+  workflow_dispatch:
+    inputs:
+      VIDEO_LINK:
+        description: 'Nico Nico video URL (e.g., "https://nicovideo.jp/watch/sm12345678")'
+        required: true
+        default: ''
+  push:
+    paths:
+      - 'scripts/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python, FFmpeg, and yt-dlp
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install system dependencies and Python packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pip install --upgrade pip
+          pip install yt-dlp
+        shell: bash
+
+      - name: Create videos directory
+        run: mkdir -p videos
+
+      - name: Run Video Feedback Effect Script
+        env:
+          VIDEO_LINK: ${{ github.event.inputs.VIDEO_LINK }}
+        run: python scripts/apply_effects.py
+
+      - name: Commit and Push Processed Video
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git pull origin main
+          git add videos/processed_*.mp4
+          if ! git diff-index --quiet HEAD; then
+              git commit -m "Add processed video from workflow run on $(date +'%Y-%m-%d %H:%M:%S')"
+              git push origin main
+          else
+              echo "No changes to commit"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
